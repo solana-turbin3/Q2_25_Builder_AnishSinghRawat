@@ -1,9 +1,9 @@
 #![allow(unexpected_cfgs)]
 use anchor_lang::{prelude::*, system_program::{Transfer, transfer}};
 
-declare_id!("2wqq41oHbVmc5Q9bxbUXLSXLmtpqc788UwDM4N1XvY7U");
+declare_id!("2wqq41oHbVmc5Q9bxbUXLSXLmtpqc788UwDM4N1XvY7U");        //Specifies the program's on-chain address
 
-#[program]
+#[program]                                                          //Specifies the module containing the program’s instruction logic
 pub mod vault {
     use super::*;
 
@@ -26,9 +26,9 @@ pub mod vault {
 
 
 //Initialize
-#[derive(Accounts)]
-pub struct Initialize<'info> {
-    #[account(mut)]                     //constraints
+#[derive(Accounts)]                                                                 //Applied to structs to indicate a list of accounts required by an instruction
+pub struct Initialize<'info> {          // 'info -> lifetime
+    #[account(mut)]                     //constraints                               
     pub signer: Signer<'info>,
 
     #[account(
@@ -156,7 +156,7 @@ impl<'info> CloseAccount<'info> {
 }
 
 
-#[account]
+#[account]                                                                      //Applied to structs to create custom account types for the program
 pub struct VaultState {
     pub vault_bump: u8,
     pub state_bump: u8,
