@@ -5,113 +5,105 @@ import { LAMPORTS_PER_SOL, PublicKey, SystemProgram } from "@solana/web3.js";
 import { confirmTransaction } from "@solana-developers/helpers";
 import { assert } from "chai";
 
-console.log(JSON.stringify(Program.fetchIdl, null, 2));
-
 describe("vault", () => {
   // Configure the client to use the local cluster.
   const provider = anchor.AnchorProvider.env();
-  
   anchor.setProvider(provider);
 
-  // the program is accessible on the anchor.workspace attribute
-  const program = anchor.workspace.Vault as Program<Vault>;
+  const program = anchor.workspace.vault as Program<Vault>;
 
   const connection = provider.connection;
 
   let signer;
-  let vault;
   let vault_state;
   let bump;
+  let vault;
 
-  before(async () => {
+
+  before(
+    async () => {
       signer = anchor.web3.Keypair.generate();
 
       [vault_state, bump] = PublicKey.findProgramAddressSync([
-          Buffer.from("state"),
-          signer.publicKey.toBuffer(),
+        Buffer.from("state"),
+        signer.publicKey.toBuffer(),        //pda jisse derive hua hai, uska toBuffer karna hai
       ], program.programId);
-      
+
       [vault, bump] = PublicKey.findProgramAddressSync([
-        Buffer.from("vault"),
         vault_state.toBuffer(),
       ], program.programId);
 
       await airdrop(connection, signer.publicKey, 5);
-      // airdrop some SOL to the vault so it does not disappear (make it rent exempt)
 
-      // let rent_exemption_amount = await calculateRentExemption(connection, vault);
+      // to make the vault rent-exempt
       await airdrop(connection, vault, 1);
-  });
+    }  
+  );
 
   it("Is initialized!", async () => {
+    // Add your test here.
     const tx = await program.methods
-      .initialize()
-      .accounts({
-        signer: signer.publicKey,
-        vault_state: vault_state,
-        vault: vault,
-        systemProgram: SystemProgram.programId,
-      })
-      .signers([signer])
-      .rpc();
-    console.log("✅ Your Initialization transaction signature", tx);
+    .initialize()
+    .accounts({
+      signer: signer.publicKey,
+      vaultState: vault_state,
+      vault: vault,
+      systemProgram: SystemProgram.programId,
+    })
+    .signers([signer])
+    .rpc();
+    console.log("Your initialize transaction signature", tx);
   });
 
   it("Is Deposited!", async () => {
-    const tx  = await program.methods
-      .deposit(new BN(1_000_000_000))
-      .accounts({
-        signer: signer.publicKey,
-        vault_state: vault_state,
-        vault: vault,
-        systemProgram: SystemProgram.programId
-      })
-      .signers([signer])
-      .rpc();
-    console.log("✅ Your Deposit transaction signature", tx);
-  
-    // assert that the vault balance increase after the transaction
-    let vaultBalance = await getBalance(connection, vault);
-    assert.equal(vaultBalance, 2 * 1_000_000_000);
+    const tx = await program.methods
+    .deposit(new BN(1_000_000_000))
+    .accounts({
+      signer: signer.publicKey,
+      vaultState: vault_state,
+      vault: vault,
+      systemProgram: SystemProgram.programId
+    })
+    .signers([signer])
+    .rpc();
+    console.log("Your deposit transaction signature", tx);
 
-    // assert that the signer balance decrease after the transaction
-    // let signerBalance = await getBalance(connection, signer.publicKey); 
-    // assert.isTrue(signerBalance <= 5);
-  });
 
-  it("Is Withdraw!", async () => {
-    const tx = program.methods
-      .withdraw(new BN(1_000_000_000))
-      .accounts({
-        signer: signer.publicKey,
-        vault_state: vault_state,
-        vault: vault,
-        systemProgram: SystemProgram.programId
-      })
-      .signers([signer])
-      .rpc();
+    //checks
+    let vault_balance = await getBalance(connection, vault);
+    assert.equal(vault_balance, 2 * 1_000_000_000);   //provided by chai
+    
+    let signerBalance = await getBalance(connection, signer.publicKey); 
+    assert.isTrue(signerBalance >= 5);
+  })
 
-      let vaultBalance = await getBalance(connection, vault);
-      // assert that the vault balance increase after the transaction
-      assert.equal(vaultBalance, 2 * LAMPORTS_PER_SOL);
+  it("Is Withdrawn!", async () => {
+    const tx = await program.methods
+    .withdraw(new BN(1))
+    .accounts({
+      signer: signer.publicKey,
+      vaultState: vault_state,
+      vault: vault,
+      systemProgram: SystemProgram.programId
+    })
+    .signers([signer])
+    .rpc();
 
-      // assert that the signer balance decrease after the transaction
-      // let signerBalance = await getBalance(connection, signer.publicKey); 
-      // assert.isTrue(signerBalance >= 4.9 * LAMPORTS_PER_SOL);
-  });
+    console.log("Your withdraw transaction signature", tx);
+  })
 
   it("Is Closed!", async () => {
-    const tx = program.methods
-      .close()
-      .accounts({
-        signer: signer.publicKey,
-        vault_state: vault_state,
-        vault: vault,
-        systemProgram: SystemProgram.programId
-      })
-      .signers([signer])
-      .rpc();
-  });
+    const tx = await program.methods
+    .close()
+    .accounts({
+      signer: signer.publicKey,
+      vaultState: vault_state,
+      vault: vault,
+      systemProgram: SystemProgram.programId
+    })
+    .signers([signer])
+    .rpc;
+  })
 });
 
 async function airdrop(connection, address: PublicKey, amount: number) {
@@ -127,22 +119,6 @@ async function airdrop(connection, address: PublicKey, amount: number) {
   console.log("✅ Tx Signature: ", confirmedAirdrop);
 
   return confirmedAirdrop;
-}
-
-async function calculateRentExemption(connection: anchor.web3.Connection, address: PublicKey) {
-  let accountInfo = await connection.getAccountInfo(address);
-
-  let accountSize;
-
-  if (accountInfo === null) {
-    accountSize = 1000;
-  } else {
-    accountSize = accountInfo.data.length;
-  }
-  
-  const rentExemptionAmount = await connection.getMinimumBalanceForRentExemption(accountSize);
-
-  return rentExemptionAmount;
 }
 
 async function getBalance(connection: anchor.web3.Connection, address: PublicKey) {
